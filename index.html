@@ -328,6 +328,16 @@
   label{display:block;font-size:13px;font-weight:600;margin-bottom:6px;color:var(--deep)}
   input,select,textarea{width:100%;font:inherit;font-size:16px;padding:12px;border:1px solid #cfc7b5;border-radius:8px;background:#fff;color:var(--ink)}
   input:focus,select:focus,textarea:focus{outline:2px solid var(--gold);outline-offset:1px}
+  .reserve-box{border:2px dashed var(--gold);border-radius:var(--r);padding:14px;background:#FFFBF2}
+  .reserve-box.on{border-style:solid;background:#FFF6DD}
+  .reserve-toggle{display:flex;gap:12px;align-items:flex-start;cursor:pointer;margin:0;min-height:44px}
+  .reserve-toggle input{width:24px;height:24px;margin-top:2px;flex:none;accent-color:var(--deep)}
+  .reserve-toggle b{display:block;font-size:16px;color:var(--deep)}
+  .reserve-toggle small{display:block;font-size:13px;font-weight:400;color:var(--muted);margin-top:2px}
+  .reserve-fields{display:grid;gap:14px;margin-top:14px}
+  .reserve-fields[hidden]{display:none}
+  .inquire .reserve-box .muted{color:#4d5856}
+  @media(min-width:760px){.reserve-fields{grid-template-columns:1fr 1fr}}
   .consent{display:flex;gap:12px;align-items:flex-start;font-size:13.5px;cursor:pointer;padding:6px 0;font-weight:400;color:var(--muted)}
   .consent input{width:22px;height:22px;margin-top:1px;flex:none;accent-color:var(--deep)}
   .hp{position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden}
@@ -914,6 +924,46 @@
           <option>Other</option>
         </select>
       </div>
+      <!-- Optional "ready to reserve" flag: tells Jonathan which leads to prioritize. No payment details are collected here. -->
+      <div class="full reserve-box">
+        <label class="reserve-toggle" for="ready">
+          <input type="checkbox" id="ready" name="ready_to_reserve">
+          <span><b>I'm ready to reserve a unit</b><small>Optional. Tick this and I'll prioritize your request and walk you through the reservation steps.</small></span>
+        </label>
+        <div class="reserve-fields" hidden>
+          <div>
+            <label for="reserve_unit">Unit you'd like to reserve (if you have one in mind)</label>
+            <input id="reserve_unit" name="reserve_unit" type="text" placeholder="e.g. 6F-000N or any west-facing studio">
+          </div>
+          <div>
+            <label for="reserve_when">When do you want to reserve?</label>
+            <select id="reserve_when" name="reserve_when">
+              <option value="">Select one</option>
+              <option>This week</option>
+              <option>Within 2 weeks</option>
+              <option>This month</option>
+            </select>
+          </div>
+          <div>
+            <label for="reserve_payment">How will you pay the reservation fee?</label>
+            <select id="reserve_payment" name="reserve_payment">
+              <option value="">Not sure yet</option>
+              <option>Bank transfer</option>
+              <option>Remittance from abroad</option>
+              <option>Check or cash at the sales office</option>
+            </select>
+          </div>
+          <div>
+            <label for="reserve_docs">Do you have a valid ID ready?</label>
+            <select id="reserve_docs" name="reserve_docs">
+              <option value="">Not sure yet</option>
+              <option>Yes, I have a valid ID</option>
+              <option>I need help with the requirements</option>
+            </select>
+          </div>
+          <p class="small muted full">Reservation fee: ₱75,000 for a studio, ₱100,000 for a 1-bedroom. Never send payment until I confirm your unit and send the developer's official payment instructions.</p>
+        </div>
+      </div>
       <div class="full">
         <label for="message">Questions or notes (optional)</label>
         <textarea id="message" name="message" rows="3"></textarea>
@@ -1357,6 +1407,16 @@ document.querySelectorAll('[data-contact="cal-online"]').forEach(a => {
   sync();
 })();
 
+/* Ready-to-reserve: reveal the optional reservation questions when ticked */
+(function () {
+  const cb = document.getElementById("ready");
+  if (!cb) return;
+  const boxEl = cb.closest(".reserve-box"), fields = boxEl.querySelector(".reserve-fields");
+  const sync = () => { fields.hidden = !cb.checked; boxEl.classList.toggle("on", cb.checked); };
+  cb.addEventListener("change", sync);
+  sync();
+})();
+
 /* Hide the floating booking button while the booking section itself is on screen */
 (function () {
   const btn = document.getElementById("book-float");
@@ -1425,6 +1485,7 @@ async function sendToAppsScript(payload) {
 
 function inquiryText(p) {
   return [
+    p.ready_to_reserve ? "🔥 READY TO RESERVE" : "",
     "Hi Jonathan, I'm interested in Novus Prime Residences.",
     "Name: " + p.name,
     "Mobile: " + p.mobile,
@@ -1439,8 +1500,13 @@ function inquiryText(p) {
     p.location ? "Based in: " + p.location : "",
     p.purpose ? "Purpose: " + p.purpose : "",
     p.timeline ? "Timeline: " + p.timeline : "",
+    p.ready_to_reserve && p.reserve_unit ? "Unit to reserve: " + p.reserve_unit : "",
+    p.ready_to_reserve && p.reserve_when ? "Reserve: " + p.reserve_when : "",
+    p.ready_to_reserve && p.reserve_payment ? "Reservation fee via: " + p.reserve_payment : "",
+    p.ready_to_reserve && p.reserve_docs ? "Valid ID: " + p.reserve_docs : "",
     p.message ? "Notes: " + p.message : "",
-    p.appointment && p.appointment.startsWith("Site viewing") ? "Please confirm my site viewing schedule." : "Please send me the computation and this month's promos."
+    p.ready_to_reserve ? "I'm ready to reserve. Please send me the reservation steps." :
+      (p.appointment && p.appointment.startsWith("Site viewing") ? "Please confirm my site viewing schedule." : "Please send me the computation and this month's promos.")
   ].filter(Boolean).join("\n");
 }
 
@@ -1481,6 +1547,9 @@ document.getElementById("lead-form").addEventListener("submit", async (e) => {
     payment: form.payment.value, budget: form.budget.value,
     channel: form.channel.value, location: form.location.value.trim(), purpose: form.purpose.value,
     timeline: form.timeline.value, contact_time: form.contact_time.value, source: form.source.value,
+    ready_to_reserve: form.ready_to_reserve.checked,
+    reserve_unit: form.reserve_unit.value.trim(), reserve_when: form.reserve_when.value,
+    reserve_payment: form.reserve_payment.value, reserve_docs: form.reserve_docs.value,
     message: form.message.value.trim(), consent: true, ...getTracking()
   };
   const first = escapeHtml(name.split(" ")[0]);
