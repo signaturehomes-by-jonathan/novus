@@ -328,12 +328,26 @@
   label{display:block;font-size:13px;font-weight:600;margin-bottom:6px;color:var(--deep)}
   input,select,textarea{width:100%;font:inherit;font-size:16px;padding:12px;border:1px solid #cfc7b5;border-radius:8px;background:#fff;color:var(--ink)}
   input:focus,select:focus,textarea:focus{outline:2px solid var(--gold);outline-offset:1px}
-  .reserve-box{border:2px dashed var(--gold);border-radius:var(--r);padding:14px;background:#FFFBF2}
+  .reserve-box{border:3px dashed var(--gold);border-radius:var(--r);padding:14px;background:#FFFBF2}
   .reserve-box.on{border-style:solid;background:#FFF6DD}
   .reserve-toggle{display:flex;gap:12px;align-items:flex-start;cursor:pointer;margin:0;min-height:44px}
   .reserve-toggle input{width:24px;height:24px;margin-top:2px;flex:none;accent-color:var(--deep)}
-  .reserve-toggle b{display:block;font-size:16px;color:var(--deep)}
-  .reserve-toggle small{display:block;font-size:13px;font-weight:400;color:var(--muted);margin-top:2px}
+  .reserve-toggle b{display:block;font-size:clamp(17px,4.6vw,21px);font-weight:800;letter-spacing:.01em;color:var(--deep);line-height:1.25}
+  .reserve-box .rt-on{display:none}
+  .reserve-box.on .rt-on{display:block}
+  .reserve-box.on .rt-off{display:none}
+  .reserve-box.on .reserve-toggle b{color:#8C6A2A}
+  .reserve-box.on{animation:reservePop .5s ease}
+  @keyframes reservePop{0%{transform:scale(.98)}60%{transform:scale(1.01)}100%{transform:scale(1)}}
+  @media (prefers-reduced-motion: reduce){.reserve-box.on{animation:none}}
+  #form-status.celebrate{display:block;background:linear-gradient(135deg,#172D2A,#21403C);color:#fff;text-align:center;padding:22px 18px}
+  #form-status.celebrate .congrats{font-size:clamp(22px,6vw,30px);font-weight:800;color:#C9A45C;line-height:1.2;margin-bottom:6px}
+  #form-status.celebrate .welcome{font-size:18px;font-weight:700;margin-bottom:10px}
+  #form-status.celebrate p{color:#e3ebe8}
+  #form-status.celebrate .small{color:#cfd8d5}
+  #form-status.celebrate .btn{background:var(--gold);color:var(--deep);font-weight:700}
+  #form-status.celebrate .btn:hover{background:#d8b56f}
+  .reserve-toggle small{display:block;font-size:14px;font-weight:500;color:#3f4a48;margin-top:4px}
   .reserve-fields{display:grid;gap:14px;margin-top:14px}
   .reserve-fields[hidden]{display:none}
   .inquire .reserve-box .muted{color:#4d5856}
@@ -928,7 +942,7 @@
       <div class="full reserve-box">
         <label class="reserve-toggle" for="ready">
           <input type="checkbox" id="ready" name="ready_to_reserve">
-          <span><b>I'm ready to reserve a unit</b><small>Optional. Tick this and I'll prioritize your request and walk you through the reservation steps.</small></span>
+          <span><b class="rt-off">🔑 I'M READY TO RESERVE A UNIT</b><b class="rt-on">🎉 ADVANCE CONGRATULATIONS! Welcome to Novus</b><small class="rt-off">Optional. Tick this and I'll prioritize your request and walk you through the reservation steps.</small><small class="rt-on">You're one step closer to your new home beside UP Dasmariñas. Answer what you can below and I'll reach out first.</small></span>
         </label>
         <div class="reserve-fields" hidden>
           <div>
@@ -1412,7 +1426,11 @@ document.querySelectorAll('[data-contact="cal-online"]').forEach(a => {
   const cb = document.getElementById("ready");
   if (!cb) return;
   const boxEl = cb.closest(".reserve-box"), fields = boxEl.querySelector(".reserve-fields");
-  const sync = () => { fields.hidden = !cb.checked; boxEl.classList.toggle("on", cb.checked); };
+  const btn = document.getElementById("submit-btn");
+  const sync = () => {
+    fields.hidden = !cb.checked; boxEl.classList.toggle("on", cb.checked);
+    if (!btn.disabled) btn.textContent = cb.checked ? "🎉 Send my reservation request" : "Request my private presentation";
+  };
   cb.addEventListener("change", sync);
   sync();
 })();
@@ -1511,11 +1529,18 @@ function inquiryText(p) {
 }
 
 /* Last line of defense: send the inquiry through chat so no lead is lost */
+function celebrateIntro(p, first, sent) {
+  return '<div class="congrats">🎉 ADVANCE CONGRATULATIONS, ' + first.toUpperCase() + '!</div>' +
+    '<div class="welcome">Welcome to Novus Prime Residences</div>' +
+    (sent ? '<p>I received your reservation request and will message you first with the next steps.</p>'
+          : '<p><strong>One last step:</strong> tap a button below to send me your reservation request. I\'ll reply with the reservation steps and the developer\'s official payment instructions.</p>');
+}
+
 function showDirectSend(p, intro) {
   const text = inquiryText(p);
   try { navigator.clipboard && navigator.clipboard.writeText(text).catch(() => {}); } catch (e) {}
   const wa = "https://wa.me/" + CONFIG.WHATSAPP_NUMBER + "?text=" + encodeURIComponent(text);
-  showStatus("ok", intro +
+  showStatus(p.ready_to_reserve ? "celebrate" : "ok", intro +
     '<div class="direct-send">' +
       '<a class="btn" href="' + wa + '" target="_blank" rel="noopener">Send on WhatsApp</a>' +
       '<a class="btn btn-dark" href="' + CONFIG.MESSENGER_URL + '" target="_blank" rel="noopener">Send on Messenger</a>' +
@@ -1555,16 +1580,20 @@ document.getElementById("lead-form").addEventListener("submit", async (e) => {
   const first = escapeHtml(name.split(" ")[0]);
 
   if (!CONFIG.N8N_WEBHOOK_URL && !CONFIG.APPS_SCRIPT_URL) {
-    showDirectSend(payload, "<strong>One last step, " + first + ":</strong> tap one button below to send me your inquiry.");
+    showDirectSend(payload, payload.ready_to_reserve ? celebrateIntro(payload, first, false) : "<strong>One last step, " + first + ":</strong> tap one button below to send me your inquiry.");
     return;
   }
 
   btn.disabled = true; btn.textContent = "Sending...";
   let delivered = await sendToN8n(payload);
   if (!delivered) { payload.delivery = "fallback"; delivered = await sendToAppsScript(payload); }
-  btn.disabled = false; btn.textContent = "Request my private presentation";
+  btn.disabled = false; btn.textContent = payload.ready_to_reserve ? "🎉 Send my reservation request" : "Request my private presentation";
 
-  if (delivered) {
+  if (delivered && payload.ready_to_reserve) {
+    form.reset();
+    document.getElementById("ready").dispatchEvent(new Event("change"));
+    showStatus("celebrate", celebrateIntro(payload, first, true));
+  } else if (delivered) {
     form.reset();
     showStatus("ok", "<strong>Thank you, " + first + "!</strong> I received your inquiry and will send the computation shortly. For a faster reply, message me on Messenger.");
   } else {
