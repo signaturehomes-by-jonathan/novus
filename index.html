@@ -750,7 +750,7 @@
           <li>Walk-through of the units, views and payment terms</li>
           <li>Scheduled at your own time zone</li>
         </ul>
-        <!-- Opens the form until CONFIG.CAL_LINK is set; then it opens Cal.com -->
+        <!-- Opens Cal.com via CONFIG.CAL_LINK; falls back to the form if the link is ever cleared -->
         <a class="btn btn-dark" href="#inquire" data-contact="cal-online" data-appt="Online presentation (Google Meet)">Book an online presentation</a>
       </div>
       <div class="book-card ph-card">
@@ -765,7 +765,7 @@
         <a class="btn btn-dark" href="#inquire" data-appt="Site viewing in Dasmariñas">Request a site viewing</a>
       </div>
     </div>
-    <p class="small muted" style="margin-top:12px">Prefer to message first? <a href="#inquire">Send a request</a>, or call 0898 5003 509.</p>
+    <p class="small muted" style="margin-top:12px">The online presentation opens my calendar in a new tab. Prefer to message first? <a href="#inquire">Send a request</a>, or call 0898 5003 509.</p>
   </div>
 </section>
 
@@ -999,7 +999,7 @@ const CONFIG = {
   WHATSAPP_NUMBER: "639431301792",
   VIBER_URL: "viber://chat?number=%2B639431301792",
   // Cal.com online presentation event for this project. Blank = the button opens the form.
-  CAL_LINK: ""
+  CAL_LINK: "https://cal.com/jonathanrebullo-homes/novus-presentation"
 };
 
 /* Hide discount figures once they are no longer valid:
